@@ -6,17 +6,17 @@ Of course, you need x11 installed in your system:
 
 ## Debian/Ubuntu
 ```bash
-sudo apt install libx11-dev
+sudo apt install libx11-dev libgl1-mesa-dev
 ```
 
 ## Fedora
 ```bash
-sudo dnf install libX11-devel
+sudo dnf install libX11-devel mesa-libGL-devel
 ```
 
 ## Arch Linux
 ```bash
-sudo pacman -S libx11
+sudo pacman -S libx11 mesa
 ```
 
 Then, just run:
