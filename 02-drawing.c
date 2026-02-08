@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <unistd.h>
+#include <stdbool.h>
 #include <math.h>
 
 #include <X11/Xlib.h>
