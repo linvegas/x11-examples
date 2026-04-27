@@ -1,12 +1,11 @@
 #include <stdio.h>
 #include <unistd.h>
-#include <stdbool.h>
 
 #include <X11/Xlib.h>
 #include <X11/keysym.h>
 
 #include <GL/gl.h>
-#include <GL/glx.h>
+#include <EGL/egl.h>
 
 int main(void)
 {
@@ -19,57 +18,63 @@ int main(void)
 
     int screen = DefaultScreen(display);
 
-    GLint glx_attrs[] = {GLX_RGBA, GLX_DEPTH_SIZE, 24, GLX_DOUBLEBUFFER, None};
-
-    XVisualInfo *visual_info = glXChooseVisual(display, screen, glx_attrs);
-    if (!visual_info)
-    {
-        fprintf(stderr, "ERROR: Could not choose a visual info!\n");
-        return 1;
-    }
-
-    XSetWindowAttributes w_attr;
-    w_attr.colormap = XCreateColormap(
-        display, RootWindow(display, screen),
-        visual_info->visual, AllocNone
-    );
-    w_attr.event_mask = ExposureMask | KeyPressMask | StructureNotifyMask;
-
-    Window window = XCreateWindow(
+    Window window = XCreateSimpleWindow(
         display, RootWindow(display, screen),
         0, 0, 800, 600, 1,
-        visual_info->depth, InputOutput, visual_info->visual,
-        CWColormap | CWEventMask, &w_attr
+        BlackPixel(display, screen),
+        BlackPixel(display, screen)
     );
 
     XStoreName(display, window, "I use x11 btw");
-
+    XSelectInput(display, window, ExposureMask | KeyPressMask | StructureNotifyMask);
     XMapWindow(display, window);
 
     // Handle the "close window" button request by the window manager
     Atom wm_delete_msg = XInternAtom(display, "WM_DELETE_WINDOW", false);
     XSetWMProtocols(display, window, &wm_delete_msg, 1);
 
-    GLXContext glx_context = glXCreateContext(display, visual_info, NULL, GL_TRUE);
-    glXMakeCurrent(display, window, glx_context);
+    // EGL
+
+    EGLDisplay egl_display = eglGetDisplay((EGLNativeDisplayType)display);
+    eglInitialize(egl_display, NULL, NULL);
+    eglBindAPI(EGL_OPENGL_API);
+
+    EGLint attr[] = {
+        EGL_RENDERABLE_TYPE, EGL_OPENGL_BIT,
+        EGL_RED_SIZE,        8,
+        EGL_GREEN_SIZE,      8,
+        EGL_BLUE_SIZE,       8,
+        EGL_DEPTH_SIZE,      24,
+        EGL_NONE
+    };
+
+    EGLConfig cfg;
+    EGLint ncfg;
+    eglChooseConfig(egl_display, attr, &cfg, 1, &ncfg);
+
+    EGLContext ctx = eglCreateContext(egl_display, cfg, EGL_NO_CONTEXT, NULL);
+    EGLSurface egl_surface = eglCreateWindowSurface(egl_display, cfg, (EGLNativeWindowType)window, NULL);
+    eglMakeCurrent(egl_display, egl_surface, egl_surface, ctx);
 
     printf("Renderer : %s\n", glGetString(GL_RENDERER));
     printf("Version  : %s\n", glGetString(GL_VERSION));
 
-    PFNGLCREATESHADERPROC glCreateShader = (PFNGLCREATESHADERPROC)glXGetProcAddress((const GLubyte*)"glCreateShader");
-    PFNGLSHADERSOURCEPROC glShaderSource = (PFNGLSHADERSOURCEPROC)glXGetProcAddress((const GLubyte*)"glShaderSource");
-    PFNGLCOMPILESHADERPROC glCompileShader = (PFNGLCOMPILESHADERPROC)glXGetProcAddress((const GLubyte*)"glCompileShader");
-    PFNGLCREATEPROGRAMPROC glCreateProgram = (PFNGLCREATEPROGRAMPROC)glXGetProcAddress((const GLubyte*)"glCreateProgram");
-    PFNGLATTACHSHADERPROC glAttachShader = (PFNGLATTACHSHADERPROC)glXGetProcAddress((const GLubyte*)"glAttachShader");
-    PFNGLLINKPROGRAMPROC glLinkProgram = (PFNGLLINKPROGRAMPROC)glXGetProcAddress((const GLubyte*)"glLinkProgram");
-    PFNGLUSEPROGRAMPROC glUseProgram = (PFNGLUSEPROGRAMPROC)glXGetProcAddress((const GLubyte*)"glUseProgram");
-    PFNGLGENVERTEXARRAYSPROC glGenVertexArrays = (PFNGLGENVERTEXARRAYSPROC)glXGetProcAddress((const GLubyte*)"glGenVertexArrays");
-    PFNGLBINDVERTEXARRAYPROC glBindVertexArray = (PFNGLBINDVERTEXARRAYPROC)glXGetProcAddress((const GLubyte*)"glBindVertexArray");
-    PFNGLGENBUFFERSPROC glGenBuffers = (PFNGLGENBUFFERSPROC)glXGetProcAddress((const GLubyte*)"glGenBuffers");
-    PFNGLBINDBUFFERPROC glBindBuffer = (PFNGLBINDBUFFERPROC)glXGetProcAddress((const GLubyte*)"glBindBuffer");
-    PFNGLBUFFERDATAPROC glBufferData = (PFNGLBUFFERDATAPROC)glXGetProcAddress((const GLubyte*)"glBufferData");
-    PFNGLENABLEVERTEXATTRIBARRAYPROC glEnableVertexAttribArray = (PFNGLENABLEVERTEXATTRIBARRAYPROC)glXGetProcAddress((const GLubyte*)"glEnableVertexAttribArray");
-    PFNGLVERTEXATTRIBPOINTERPROC glVertexAttribPointer = (PFNGLVERTEXATTRIBPOINTERPROC)glXGetProcAddress((const GLubyte*)"glVertexAttribPointer");
+    // OPENGL
+
+    PFNGLCREATESHADERPROC glCreateShader = (PFNGLCREATESHADERPROC)eglGetProcAddress("glCreateShader");
+    PFNGLSHADERSOURCEPROC glShaderSource = (PFNGLSHADERSOURCEPROC)eglGetProcAddress("glShaderSource");
+    PFNGLCOMPILESHADERPROC glCompileShader = (PFNGLCOMPILESHADERPROC)eglGetProcAddress("glCompileShader");
+    PFNGLCREATEPROGRAMPROC glCreateProgram = (PFNGLCREATEPROGRAMPROC)eglGetProcAddress("glCreateProgram");
+    PFNGLATTACHSHADERPROC glAttachShader = (PFNGLATTACHSHADERPROC)eglGetProcAddress("glAttachShader");
+    PFNGLLINKPROGRAMPROC glLinkProgram = (PFNGLLINKPROGRAMPROC)eglGetProcAddress("glLinkProgram");
+    PFNGLUSEPROGRAMPROC glUseProgram = (PFNGLUSEPROGRAMPROC)eglGetProcAddress("glUseProgram");
+    PFNGLGENVERTEXARRAYSPROC glGenVertexArrays = (PFNGLGENVERTEXARRAYSPROC)eglGetProcAddress("glGenVertexArrays");
+    PFNGLBINDVERTEXARRAYPROC glBindVertexArray = (PFNGLBINDVERTEXARRAYPROC)eglGetProcAddress("glBindVertexArray");
+    PFNGLGENBUFFERSPROC glGenBuffers = (PFNGLGENBUFFERSPROC)eglGetProcAddress("glGenBuffers");
+    PFNGLBINDBUFFERPROC glBindBuffer = (PFNGLBINDBUFFERPROC)eglGetProcAddress("glBindBuffer");
+    PFNGLBUFFERDATAPROC glBufferData = (PFNGLBUFFERDATAPROC)eglGetProcAddress("glBufferData");
+    PFNGLENABLEVERTEXATTRIBARRAYPROC glEnableVertexAttribArray = (PFNGLENABLEVERTEXATTRIBARRAYPROC)eglGetProcAddress("glEnableVertexAttribArray");
+    PFNGLVERTEXATTRIBPOINTERPROC glVertexAttribPointer = (PFNGLVERTEXATTRIBPOINTERPROC)eglGetProcAddress("glVertexAttribPointer");
 
     const char *vert_shader =
         "#version 330 core\n"
@@ -159,7 +164,7 @@ int main(void)
 
         glDrawArrays(GL_TRIANGLES, 0, 3);
 
-        glXSwapBuffers(display, window);
+        eglSwapBuffers(egl_display, egl_surface);
 
         // Caps to 60 FPS
         usleep(16666);

@@ -11,3 +11,6 @@ all: 00-basic 01-poll-events 02-drawing 03-gl-context
 
 03-gl-context: 03-gl-context.c
 	cc -ggdb -Wall -Wextra 03-gl-context.c -o 03-gl-context -lX11 -lGL
+
+04-egl-context: 04-egl-context.c
+	cc -ggdb -Wall -Wextra 04-egl-context.c -o 04-egl-context -lX11 -lGL -lEGL
